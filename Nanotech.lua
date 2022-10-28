@@ -33,7 +33,19 @@ local function acceptedConductor(r)
     return bit.band(elem.property(type, "Properties"), elem.PROP_CONDUCTS) and not usnsNoConduct(type) and sim.partProperty(r, "life") == 0
 end
 
-
+local function raycast(x, y, dx, dy, range)
+    local i = 0
+    while i < range && (x >= 0 && y >= 0 && x < sim.XRES && y < sim.YRES) do
+        x = x + dx
+        y = y + dy
+        local r = sim.pmap(x, y)
+        if r ~= nil then
+            return r
+        end
+        i++
+    end
+    return nil
+end
 
 -- Element definitions
 local nano = elem.allocate("NANOTECH", "NANO") -- Nanobots
