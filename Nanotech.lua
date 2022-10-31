@@ -53,6 +53,51 @@ local function raycast(x, y, dx, dy, range)
     return nil
 end
 
+-- Writes ctype data to a line of FILT particles
+local function writeFiltLine(x, y, rx, ry, wl)
+	if boundsCheck(x + rx, y + ry) and not (rx == 0 and ry == 0) then
+		r = sim.pmap(x + rx, y + ry)
+		if r then
+			local nx = x + rx;
+			local ny = y + ry;
+			-- Trace a line of FILT
+			while (r and sim.partProperty(r, "type") == elem.DEFAULT_PT_FILT) do
+				sim.partProperty(r, "ctype", wl);
+				nx = nx + rx
+				ny = ny + ry
+				if not boundsCheck(nx, ny) then
+					break;
+				end
+				r = sim.pmap(nx, ny)
+			end
+		end
+	end
+end
+
+local function sparkInRange(x, y)
+	local r
+	local rt
+	local rx = -2
+	while rx <= 2 do
+		local ry = -2
+		while ry <= 2 do
+			if boundsCheck(x + rx, y + ry) and not (rx == 0 and ry == 0) then
+				r = sim.pmap(x + rx, y + ry)
+				if r then
+					rt = sim.partProperty(r, "type");
+					if acceptedConductor(r) then
+						sim.partProperty(r, "life", 4);
+						sim.partProperty(r, "ctype", rt);
+						sim.partChangeType(r, elem.DEFAULT_PT_SPRK);
+					end
+				end
+			end
+			ry = ry + 1
+		end
+		rx = rx + 1
+	end
+end
+
 local function maskAndDivide(num, mask, floor)
 	return bit.band(num, mask) / floor
 end
@@ -202,10 +247,8 @@ function usnsUpdate(i, x, y)
 	local ts = math.floor(math.max(sim.partProperty(i, "temp") - 273.15, 0)) -- ThreShold
 
 
-    local r
     local rx
     local ry
-    local rt
     local rd = sim.partProperty(i, "tmp2")
 
 	if rd > 25 then 
@@ -215,8 +258,6 @@ function usnsUpdate(i, x, y)
 
 	-- Search for all particles in range
 	local particles = {}
-	local setFilt = false
-	local photonWl = 0
 
 	-- TODO: Search Mode 0x5
 	-- if sm == 5 then
@@ -251,52 +292,16 @@ function usnsUpdate(i, x, y)
 		if comparisonOperators[dm] then
 			-- Classic detection
 			if prop == "type" or comparisonOperators[dm](val, ts) then
-				rx = -2
-				while rx <= 2 do
-					ry = -2
-					while ry <= 2 do
-						if boundsCheck(x + rx, y + ry) and not (rx == 0 and ry == 0) then
-							r = sim.pmap(x + rx, y + ry)
-							if r then
-								rt = sim.partProperty(r, "type");
-								if acceptedConductor(r) then
-									sim.partProperty(r, "life", 4);
-									sim.partProperty(r, "ctype", rt);
-									sim.partChangeType(r, elem.DEFAULT_PT_SPRK);
-								end
-							end
-						end
-						ry = ry + 1
-					end
-					rx = rx + 1
-				end
+				sparkInRange(x, y)
 			end
 		elseif dm == 4 then
 			-- Serialization
-			local photonWl = 0x10000000 + val
-			local nx
-			local ny
+			local wl = 0x10000000 + val
 			rx = -1
-			while rx < 2 do
+			while rx <= 1 do
 				ry = -1
-				while ry < 2 do
-					if boundsCheck(x + rx, y + ry) and not (rx == 0 and ry == 0) then
-						r = sim.pmap(x + rx, y + ry)
-						if r then
-							nx = x + rx;
-							ny = y + ry;
-							-- Trace a line of FILT
-							while (r and sim.partProperty(r, "type") == elem.DEFAULT_PT_FILT) do
-								sim.partProperty(r, "ctype", photonWl);
-								nx = nx + rx
-								ny = ny + ry
-								if not boundsCheck(nx, ny) then
-									break;
-								end
-								r = sim.pmap(nx, ny)
-							end
-						end
-					end
+				while ry <= 1 do
+					writeFiltLine(x, y, rx, ry, wl)
 					ry = ry + 1
 				end
 				rx = rx + 1
